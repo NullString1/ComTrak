@@ -172,7 +172,7 @@ fun LoginScreen(
                 OutlinedTextField(
                     value = serverUrl,
                     onValueChange = { viewModel.onServerUrlChanged(it) },
-                    label = { Text("Backend URL (e.g. http://10.0.2.2:8080)") },
+                    label = { Text("Backend URL (e.g. http://100.113.172.90:8080)") },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )

@@ -36,8 +36,9 @@ class ApiClient(context: Context) {
         .build()
 
     val apiService: ComTrakApiService by lazy {
+        val baseUrl = sessionManager.serverBaseUrl.trimEnd('/') + "/"
         Retrofit.Builder()
-            .baseUrl(sessionManager.serverBaseUrl)
+            .baseUrl(baseUrl)
             .client(okHttpClient)
             .addConverterFactory(GsonConverterFactory.create())
             .build()
