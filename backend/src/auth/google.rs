@@ -37,6 +37,10 @@ impl GoogleVerifier {
             });
         }
 
+        if id_token.trim().is_empty() {
+            return Err(AppError::Auth("Empty Google ID token".to_string()));
+        }
+
         // Validate via Google's tokeninfo API endpoint
         let url = format!("https://oauth2.googleapis.com/tokeninfo?id_token={}", id_token);
         let resp = self
@@ -47,6 +51,8 @@ impl GoogleVerifier {
             .map_err(|e| AppError::Auth(format!("Failed to connect to Google Auth server: {}", e)))?;
 
         if !resp.status().is_success() {
+            let body = resp.text().await.unwrap_or_default();
+            tracing::warn!("Google tokeninfo rejected ID token: {}", body);
             return Err(AppError::Auth("Invalid Google ID token".to_string()));
         }
 

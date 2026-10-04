@@ -42,6 +42,7 @@ import androidx.credentials.CredentialManager
 import androidx.credentials.GetCredentialRequest
 import androidx.credentials.exceptions.GetCredentialException
 import com.google.android.libraries.identity.googleid.GetGoogleIdOption
+import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
 import kotlinx.coroutines.launch
 
 @Composable
@@ -126,8 +127,13 @@ fun LoginScreen(
                                     .build()
 
                                 val result = credentialManager.getCredential(context = context, request = request)
-                                // Extract ID token from credential
-                                viewModel.handleGoogleIdToken(result.credential.data.getString("androidx.credentials.BUNDLE_KEY_ID_TOKEN", ""), onLoginSuccess)
+                                val credential = result.credential
+                                if (credential.type == GoogleIdTokenCredential.TYPE_GOOGLE_ID_TOKEN_CREDENTIAL) {
+                                    val googleCred = GoogleIdTokenCredential.createFrom(credential.data)
+                                    viewModel.handleGoogleIdToken(googleCred.idToken, onLoginSuccess)
+                                } else {
+                                    viewModel.errorMessage.value = "Unexpected credential type: ${credential.type}"
+                                }
                             } catch (e: GetCredentialException) {
                                 // Fallback / Dev message
                                 viewModel.errorMessage.value = "Google Sign-In: ${e.message}. (Use Dev Login button below for local testing without Google Project)"
