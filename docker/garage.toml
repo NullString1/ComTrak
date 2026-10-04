@@ -1,0 +1,25 @@
+# Garage S3 Configuration for ComTrak Local / Production Storage
+metadata_dir = "/var/lib/garage/meta"
+data_dir = "/var/lib/garage/data"
+db_engine = "sqlite"
+
+replication_factor = 1
+
+# RPC port for internal communication (single node)
+rpc_bind_addr = "0.0.0.0:3901"
+rpc_public_addr = "127.0.0.1:3901"
+rpc_secret = "4a1d87e02b801458e0a1b896f7c9e03d4a1d87e02b801458e0a1b896f7c9e03d"
+
+[s3_api]
+api_bind_addr = "0.0.0.0:3900"
+s3_region = "garage"
+root_domain = ".s3.garage"
+
+[s3_web]
+bind_addr = "0.0.0.0:3902"
+root_domain = ".web.garage"
+root_target = "comtrak-media"
+
+[admin]
+api_bind_addr = "0.0.0.0:3903"
+admin_token = "comtrak_admin_token_secret_123456"

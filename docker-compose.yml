@@ -1,0 +1,59 @@
+services:
+  # -------------------------------------------------------------
+  # Garage S3 Object Store (Pure Rust, Ultra Lightweight)
+  # -------------------------------------------------------------
+  garage:
+    image: dxflrs/garage:v1.0.1
+    container_name: comtrak-garage
+    restart: unless-stopped
+    volumes:
+      - ./docker/garage.toml:/etc/garage.toml:ro
+      - garage_meta:/var/lib/garage/meta
+      - garage_data:/var/lib/garage/data
+    ports:
+      - "3900:3900" # S3 API endpoint
+      - "3902:3902" # S3 Web endpoint (optional)
+      - "3903:3903" # Admin API endpoint (optional)
+    environment:
+      - RUST_LOG=garage=info
+    healthcheck:
+      test: ["CMD", "/garage", "status"]
+      interval: 3s
+      timeout: 3s
+      retries: 5
+
+  # -------------------------------------------------------------
+  # ComTrak Rust Backend
+  # -------------------------------------------------------------
+  backend:
+    image: comtrak-backend:latest
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: comtrak-backend
+    restart: unless-stopped
+    depends_on:
+      garage:
+        condition: service_healthy
+    ports:
+      - "8080:8080"
+    volumes:
+      - sqlite_data:/data
+    environment:
+      - HOST=0.0.0.0
+      - PORT=8080
+      - DATA_DIR=/data
+      - DATABASE_URL=sqlite:/data/comtrak.db?mode=rwc
+      - GARAGE_ENDPOINT=http://garage:3900
+      - GARAGE_REGION=garage
+      - GARAGE_BUCKET=comtrak-media
+      - GARAGE_ACCESS_KEY=GK67b688efc14709ffdec5f6d4
+      - GARAGE_SECRET_KEY=0147a79d361b583c2cff56ad368e56185d29c963a4bda02c0617be1f1205aac7
+      - JWT_SECRET=change-me-to-a-secure-random-secret-in-production-123456
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID:-}
+      - RUST_LOG=info,comtrak_backend=debug
+
+volumes:
+  garage_meta:
+  garage_data:
+  sqlite_data:

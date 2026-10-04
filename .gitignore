@@ -1,0 +1,36 @@
+# Nix build symlinks
+result
+result-*
+
+# Rust
+backend/target/
+**/*.rs.bk
+
+# Android & Gradle
+.gradle/
+build/
+app/build/
+android/.gradle/
+android/build/
+android/app/build/
+*.apk
+*.aab
+local.properties
+.idea/
+*.iml
+.cxx/
+
+# Database & runtime files
+*.db
+*.db-shm
+*.db-wal
+backend/dev.db*
+data/
+
+# Environment files
+.env
+.env.local
+
+# OS files
+.DS_Store
+Thumbs.db
