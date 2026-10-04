@@ -25,7 +25,7 @@ local.properties
 *.db-shm
 *.db-wal
 backend/dev.db*
-data/
+/data/
 
 # Environment files
 .env

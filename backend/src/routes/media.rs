@@ -5,6 +5,7 @@ use axum::{
     response::{IntoResponse, Response},
     Json,
 };
+use crate::audit::AuditLogger;
 use crate::auth::AuthUser;
 use crate::error::{AppError, Result};
 use crate::models::{
@@ -15,6 +16,7 @@ use crate::AppState;
 pub async fn upload_media(
     State(state): State<AppState>,
     auth_user: AuthUser,
+    headers: HeaderMap,
     mut multipart: Multipart,
 ) -> Result<Json<MediaUploadResponse>> {
     let mut file_bytes: Option<Vec<u8>> = None;
@@ -129,6 +131,23 @@ pub async fn upload_media(
 
     let media_url = format!("/api/v1/media/{}", media_id);
 
+    AuditLogger::log(
+        &state.db,
+        Some(&auth_user.user_id),
+        None,
+        "MEDIA_UPLOAD",
+        "media_attachment",
+        Some(&media_id),
+        Some(&serde_json::json!({
+            "commission_id": comm_id,
+            "media_type": media_type,
+            "file_size_bytes": file_size,
+            "mime_type": mime_type,
+        })),
+        Some(&headers),
+    )
+    .await?;
+
     Ok(Json(MediaUploadResponse {
         id: media_id,
         commission_id: comm_id,
@@ -136,6 +155,46 @@ pub async fn upload_media(
         mime_type,
         url: media_url,
     }))
+}
+
+pub async fn delete_media(
+    State(state): State<AppState>,
+    auth_user: AuthUser,
+    headers: HeaderMap,
+    Path(id): Path<String>,
+) -> Result<Json<serde_json::Value>> {
+    let now = current_time_millis();
+
+    let result = sqlx::query(
+        "UPDATE media_attachments SET deleted_at = $1 WHERE id = $2 AND user_id = $3 AND deleted_at IS NULL",
+    )
+    .bind(now)
+    .bind(&id)
+    .bind(&auth_user.user_id)
+    .execute(&state.db)
+    .await?;
+
+    if result.rows_affected() == 0 {
+        return Err(AppError::NotFound(format!("Media item '{}' not found", id)));
+    }
+
+    AuditLogger::log(
+        &state.db,
+        Some(&auth_user.user_id),
+        None,
+        "MEDIA_SOFT_DELETE",
+        "media_attachment",
+        Some(&id),
+        Some(&serde_json::json!({ "deleted_at": now })),
+        Some(&headers),
+    )
+    .await?;
+
+    Ok(Json(serde_json::json!({
+        "success": true,
+        "id": id,
+        "deleted_at": now
+    })))
 }
 
 pub async fn get_media(

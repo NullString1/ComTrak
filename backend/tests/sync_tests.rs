@@ -1,6 +1,7 @@
 mod common;
 
 use axum::extract::{Query, State};
+use axum::http::HeaderMap;
 use axum::Json;
 
 use common::setup_test_context;
@@ -46,6 +47,7 @@ async fn test_sync_push_creates_offline_commissions() {
     let Json(push_resp) = sync_push(
         State(ctx.state.clone()),
         ctx.user_a.clone(),
+        HeaderMap::new(),
         Json(push_req),
     )
     .await
@@ -102,6 +104,7 @@ async fn test_sync_push_last_write_wins_conflict_resolution() {
     let _ = sync_push(
         State(ctx.state.clone()),
         ctx.user_a.clone(),
+        HeaderMap::new(),
         Json(SyncPushRequest {
             commissions: vec![item_v1],
             updates: vec![],
@@ -137,6 +140,7 @@ async fn test_sync_push_last_write_wins_conflict_resolution() {
     let Json(resp_newer) = sync_push(
         State(ctx.state.clone()),
         ctx.user_a.clone(),
+        HeaderMap::new(),
         Json(SyncPushRequest {
             commissions: vec![item_v2_newer],
             updates: vec![],
@@ -185,6 +189,7 @@ async fn test_sync_push_last_write_wins_conflict_resolution() {
     let _ = sync_push(
         State(ctx.state.clone()),
         ctx.user_a.clone(),
+        HeaderMap::new(),
         Json(SyncPushRequest {
             commissions: vec![item_v_stale],
             updates: vec![],
@@ -222,6 +227,7 @@ async fn test_sync_pull_delta_filtering_and_tombstones() {
     let _ = sync_push(
         State(ctx.state.clone()),
         ctx.user_a.clone(),
+        HeaderMap::new(),
         Json(SyncPushRequest {
             commissions: vec![CommissionSyncItem {
                 id: comm1_id.clone(),
@@ -256,6 +262,7 @@ async fn test_sync_pull_delta_filtering_and_tombstones() {
     let _ = sync_push(
         State(ctx.state.clone()),
         ctx.user_a.clone(),
+        HeaderMap::new(),
         Json(SyncPushRequest {
             commissions: vec![CommissionSyncItem {
                 id: comm2_id.clone(),
@@ -290,6 +297,7 @@ async fn test_sync_pull_delta_filtering_and_tombstones() {
     let _ = delete_commission(
         State(ctx.state.clone()),
         ctx.user_a.clone(),
+        HeaderMap::new(),
         axum::extract::Path(comm1_id.clone()),
     )
     .await
@@ -299,6 +307,7 @@ async fn test_sync_pull_delta_filtering_and_tombstones() {
     let Json(pull_resp) = sync_pull(
         State(ctx.state.clone()),
         ctx.user_a.clone(),
+        HeaderMap::new(),
         Query(SyncPullQuery { since: Some(2000) }),
     )
     .await
@@ -326,6 +335,7 @@ async fn test_sync_multi_tenant_isolation() {
     let Json(comm_a) = create_commission(
         State(ctx.state.clone()),
         ctx.user_a.clone(),
+        HeaderMap::new(),
         Json(CreateCommissionRequest {
             id: None,
             title: "Potter A Secret Bowl".to_string(),
@@ -352,6 +362,7 @@ async fn test_sync_multi_tenant_isolation() {
     let Json(user_b_pull) = sync_pull(
         State(ctx.state.clone()),
         ctx.user_b.clone(),
+        HeaderMap::new(),
         Query(SyncPullQuery { since: Some(0) }),
     )
     .await
@@ -393,6 +404,7 @@ async fn test_sync_multi_tenant_isolation() {
     let _ = sync_push(
         State(ctx.state.clone()),
         ctx.user_b.clone(),
+        HeaderMap::new(),
         Json(malicious_push),
     )
     .await;

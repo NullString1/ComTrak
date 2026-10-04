@@ -204,6 +204,23 @@ pub struct SyncPullResponse {
     pub media: Vec<MediaAttachment>,
 }
 
+// ==========================================
+// 6. Audit Log Models
+// ==========================================
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
+pub struct AuditLog {
+    pub id: String,
+    pub user_id: Option<String>,
+    pub actor_email: Option<String>,
+    pub action: String,
+    pub entity_type: String,
+    pub entity_id: Option<String>,
+    pub details: Option<String>,
+    pub ip_address: Option<String>,
+    pub user_agent: Option<String>,
+    pub created_at: i64,
+}
+
 // Helper to get current epoch millis
 pub fn current_time_millis() -> i64 {
     Utc::now().timestamp_millis()
@@ -212,3 +229,4 @@ pub fn current_time_millis() -> i64 {
 pub fn new_uuid() -> String {
     Uuid::new_v4().to_string()
 }
+

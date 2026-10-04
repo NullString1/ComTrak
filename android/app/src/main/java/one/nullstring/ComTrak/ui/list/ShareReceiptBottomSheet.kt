@@ -77,31 +77,8 @@ fun ShareReceiptBottomSheet(
         } ?: "Unset"
     }
 
-    // Build the formatted commission receipt
     val receiptText = remember(commission) {
-        buildString {
-            appendLine("🏺 ComTrak Commission Summary")
-            appendLine("═════════════════════════════════════")
-            appendLine("Project: ${commission.title}")
-            appendLine("Customer: ${commission.customerName}")
-            if (!commission.customerPhone.isNullOrBlank()) appendLine("Phone: ${commission.customerPhone}")
-            if (!commission.customerEmail.isNullOrBlank()) appendLine("Email: ${commission.customerEmail}")
-            appendLine("─────────────────────────────────────")
-            appendLine("Item: ${commission.itemName}")
-            appendLine("Quantity: ${commission.quantity}")
-            if (!commission.size.isNullOrBlank()) appendLine("Dimensions: ${commission.size}")
-            if (!commission.colour.isNullOrBlank()) appendLine("Target Colour: ${commission.colour}")
-            appendLine("Price: $priceDisplay")
-            appendLine("Due Date: $formattedDueDate")
-            appendLine("Status: ${state.displayName}")
-            if (!commission.clayBody.isNullOrBlank()) appendLine("Clay Body: ${commission.clayBody}")
-            if (!commission.glazes.isNullOrBlank()) appendLine("Glazes: ${commission.glazes}")
-            if (!commission.description.isNullOrBlank()) {
-                appendLine("Notes: ${commission.description}")
-            }
-            appendLine("═════════════════════════════════════")
-            appendLine("Tracked with ComTrak Studio")
-        }
+        buildReceiptText(commission)
     }
 
     ModalBottomSheet(onDismissRequest = onDismiss) {
@@ -228,3 +205,40 @@ fun ShareReceiptBottomSheet(
         )
     }
 }
+
+fun buildReceiptText(commission: CommissionEntity): String {
+    val formattedDueDate = commission.dueDate?.let {
+        SimpleDateFormat("MMMM dd, yyyy", Locale.US).format(Date(it))
+    } ?: "No SLA set"
+
+    val state = CommissionState.fromId(commission.status)
+
+    val priceDisplay = commission.priceCents?.let {
+        String.format(Locale.US, "$%.2f", it / 100.0)
+    } ?: "Unset"
+
+    return buildString {
+        appendLine("🏺 ComTrak Commission Summary")
+        appendLine("═════════════════════════════════════")
+        appendLine("Project: ${commission.title}")
+        appendLine("Customer: ${commission.customerName}")
+        if (!commission.customerPhone.isNullOrBlank()) appendLine("Phone: ${commission.customerPhone}")
+        if (!commission.customerEmail.isNullOrBlank()) appendLine("Email: ${commission.customerEmail}")
+        appendLine("─────────────────────────────────────")
+        appendLine("Item: ${commission.itemName}")
+        appendLine("Quantity: ${commission.quantity}")
+        if (!commission.size.isNullOrBlank()) appendLine("Dimensions: ${commission.size}")
+        if (!commission.colour.isNullOrBlank()) appendLine("Target Colour: ${commission.colour}")
+        appendLine("Price: $priceDisplay")
+        appendLine("Due Date: $formattedDueDate")
+        appendLine("Status: ${state.displayName}")
+        if (!commission.clayBody.isNullOrBlank()) appendLine("Clay Body: ${commission.clayBody}")
+        if (!commission.glazes.isNullOrBlank()) appendLine("Glazes: ${commission.glazes}")
+        if (!commission.description.isNullOrBlank()) {
+            appendLine("Notes: ${commission.description}")
+        }
+        appendLine("═════════════════════════════════════")
+        appendLine("Tracked with ComTrak Studio")
+    }
+}
+

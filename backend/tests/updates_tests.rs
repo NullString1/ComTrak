@@ -1,6 +1,7 @@
 mod common;
 
 use axum::extract::{Path, State};
+use axum::http::HeaderMap;
 use axum::Json;
 
 use common::setup_test_context;
@@ -36,6 +37,7 @@ async fn test_status_transition_cascades_to_parent_commission() {
     let Json(commission) = create_commission(
         State(ctx.state.clone()),
         ctx.user_a.clone(),
+        HeaderMap::new(),
         Json(create_payload),
     )
     .await
@@ -56,6 +58,7 @@ async fn test_status_transition_cascades_to_parent_commission() {
     let Json(update_record) = add_update(
         State(ctx.state.clone()),
         ctx.user_a.clone(),
+        HeaderMap::new(),
         Path(commission.id.clone()),
         Json(update_payload),
     )
@@ -108,6 +111,7 @@ async fn test_progress_note_without_status_change() {
     let Json(commission) = create_commission(
         State(ctx.state.clone()),
         ctx.user_a.clone(),
+        HeaderMap::new(),
         Json(create_payload),
     )
     .await
@@ -125,6 +129,7 @@ async fn test_progress_note_without_status_change() {
     let Json(update_record) = add_update(
         State(ctx.state.clone()),
         ctx.user_a.clone(),
+        HeaderMap::new(),
         Path(commission.id.clone()),
         Json(update_payload),
     )
@@ -189,6 +194,7 @@ async fn test_multi_tenant_isolation_updates() {
     let Json(comm_a) = create_commission(
         State(ctx.state.clone()),
         ctx.user_a.clone(),
+        HeaderMap::new(),
         Json(create_payload),
     )
     .await
@@ -198,6 +204,7 @@ async fn test_multi_tenant_isolation_updates() {
     let update_res = add_update(
         State(ctx.state.clone()),
         ctx.user_b.clone(),
+        HeaderMap::new(),
         Path(comm_a.id.clone()),
         Json(CreateUpdateRequest {
             id: None,
@@ -236,6 +243,7 @@ async fn test_full_pottery_workflow_state_transitions() {
     let Json(comm) = create_commission(
         State(ctx.state.clone()),
         ctx.user_a.clone(),
+        HeaderMap::new(),
         Json(CreateCommissionRequest {
             id: None,
             title: "Custom Ceramic Coffee Dripper".to_string(),
@@ -272,6 +280,7 @@ async fn test_full_pottery_workflow_state_transitions() {
         let _ = add_update(
             State(ctx.state.clone()),
             ctx.user_a.clone(),
+            HeaderMap::new(),
             Path(comm.id.clone()),
             Json(CreateUpdateRequest {
                 id: None,

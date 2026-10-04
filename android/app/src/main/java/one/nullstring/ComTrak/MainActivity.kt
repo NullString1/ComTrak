@@ -71,14 +71,13 @@ fun ComTrakNavHost(startDestination: String) {
             route = "commission_detail/{id}",
             arguments = listOf(navArgument("id") { type = NavType.StringType })
         ) { backStackEntry ->
+            val context = androidx.compose.ui.platform.LocalContext.current
+            val app = context.applicationContext as android.app.Application
             val commissionId = backStackEntry.arguments?.getString("id") ?: return@composable
             val detailViewModel = viewModel<CommissionDetailViewModel>(
                 factory = object : androidx.lifecycle.ViewModelProvider.Factory {
                     override fun <T : androidx.lifecycle.ViewModel> create(modelClass: Class<T>): T {
                         @Suppress("UNCHECKED_CAST")
-                        val app = backStackEntry.destination.let {
-                            androidx.compose.ui.platform.LocalContext.current.applicationContext as android.app.Application
-                        }
                         return CommissionDetailViewModel(app, commissionId) as T
                     }
                 }
@@ -100,6 +99,8 @@ fun ComTrakNavHost(startDestination: String) {
                 defaultValue = null
             })
         ) { backStackEntry ->
+            val context = androidx.compose.ui.platform.LocalContext.current
+            val app = context.applicationContext as android.app.Application
             val existingId = backStackEntry.arguments?.getString("id")
             val isNew = existingId.isNullOrEmpty()
 
@@ -107,7 +108,6 @@ fun ComTrakNavHost(startDestination: String) {
                 factory = object : androidx.lifecycle.ViewModelProvider.Factory {
                     override fun <T : androidx.lifecycle.ViewModel> create(modelClass: Class<T>): T {
                         @Suppress("UNCHECKED_CAST")
-                        val app = androidx.compose.ui.platform.LocalContext.current.applicationContext as android.app.Application
                         return EditCommissionViewModel(app, existingId) as T
                     }
                 }

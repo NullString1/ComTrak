@@ -4,9 +4,10 @@
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
     flake-utils.url = "github:numtide/flake-utils";
+    crane.url = "github:ipetkov/crane";
   };
 
-  outputs = { self, nixpkgs, flake-utils, ... }:
+  outputs = { self, nixpkgs, flake-utils, crane, ... }:
     let
       # Supported systems for devShells and packages
       systems = [ "x86_64-linux" "aarch64-linux" "x86_64-darwin" "aarch64-darwin" ];
@@ -20,15 +21,21 @@
           };
         };
 
-        # Rust package for backend
-        backendPkg = pkgs.rustPlatform.buildRustPackage {
+        craneLib = crane.mkLib pkgs;
+
+        # Filter source to include Rust files, Cargo files, and SQL migration files
+        sqlFilter = path: _type: builtins.match ".*\\.sql$" path != null;
+        src = pkgs.lib.cleanSourceWith {
+          src = ./backend;
+          filter = path: type:
+            (sqlFilter path type) || (craneLib.filterCargoSources path type);
+        };
+
+        commonArgs = {
+          inherit src;
           pname = "comtrak-backend";
           version = "0.1.0";
-          src = ./backend;
-
-          cargoLock = {
-            lockFile = ./backend/Cargo.lock;
-          };
+          strictDeps = true;
 
           nativeBuildInputs = with pkgs; [
             pkg-config
@@ -45,17 +52,24 @@
           # Compile SQLx in offline mode without requiring a live SQLite DB during nix build
           SQLX_OFFLINE = "true";
           doCheck = false;
+        };
 
+        # Pre-build dependencies only (cached by Nix across application code changes!)
+        cargoArtifacts = craneLib.buildDepsOnly commonArgs;
+
+        # Build application on top of cached cargo dependencies
+        backendPkg = craneLib.buildPackage (commonArgs // {
+          inherit cargoArtifacts;
           meta = with pkgs.lib; {
             description = "ComTrak REST and Offline-First Sync Backend";
             homepage = "https://github.com/comtrak/comtrak";
             license = licenses.mit;
             maintainers = [ ];
           };
-        };
+        });
 
-        # Layered Docker OCI image built natively with Nix
-        dockerImage = pkgs.dockerTools.buildLayeredImage {
+        # Layered Docker OCI image configuration
+        dockerImageConfig = {
           name = "comtrak-backend";
           tag = "latest";
 
@@ -86,11 +100,19 @@
           };
         };
 
+        # Fast streaming image directly pipeable to docker load (takes < 1s)
+        dockerStream = pkgs.dockerTools.streamLayeredImage dockerImageConfig;
+
+        # Traditional compressed tarball image for archiving or offline transport
+        dockerTar = pkgs.dockerTools.buildLayeredImage dockerImageConfig;
+
       in
       {
         packages = {
           backend = backendPkg;
-          dockerImage = dockerImage;
+          dockerImage = dockerStream;
+          dockerStream = dockerStream;
+          dockerTar = dockerTar;
           default = backendPkg;
         };
 

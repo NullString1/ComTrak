@@ -1,6 +1,7 @@
 mod common;
 
 use axum::extract::{Path, State};
+use axum::http::HeaderMap;
 use axum::Json;
 use chrono::Utc;
 use uuid::Uuid;
@@ -38,6 +39,7 @@ async fn test_create_commission_default_values() {
     let Json(commission) = create_commission(
         State(ctx.state.clone()),
         ctx.user_a.clone(),
+        HeaderMap::new(),
         Json(payload),
     )
     .await
@@ -87,6 +89,7 @@ async fn test_create_commission_preserves_client_uuid() {
     let Json(commission) = create_commission(
         State(ctx.state.clone()),
         ctx.user_a.clone(),
+        HeaderMap::new(),
         Json(payload),
     )
     .await
@@ -125,6 +128,7 @@ async fn test_update_commission_partial_and_version_increment() {
     let Json(initial) = create_commission(
         State(ctx.state.clone()),
         ctx.user_a.clone(),
+        HeaderMap::new(),
         Json(create_payload),
     )
     .await
@@ -158,6 +162,7 @@ async fn test_update_commission_partial_and_version_increment() {
     let Json(updated) = update_commission(
         State(ctx.state.clone()),
         ctx.user_a.clone(),
+        HeaderMap::new(),
         Path(initial.id.clone()),
         Json(update_payload),
     )
@@ -204,6 +209,7 @@ async fn test_multi_tenant_isolation_commissions() {
     let Json(comm_a) = create_commission(
         State(ctx.state.clone()),
         ctx.user_a.clone(),
+        HeaderMap::new(),
         Json(create_payload),
     )
     .await
@@ -225,6 +231,7 @@ async fn test_multi_tenant_isolation_commissions() {
     let update_result = update_commission(
         State(ctx.state.clone()),
         ctx.user_b.clone(),
+        HeaderMap::new(),
         Path(comm_a.id.clone()),
         Json(UpdateCommissionRequest {
             title: Some("Hacked Title".into()),
@@ -337,6 +344,7 @@ async fn test_sla_urgency_ordering() {
     let Json(comm_future) = create_commission(
         State(ctx.state.clone()),
         ctx.user_a.clone(),
+        HeaderMap::new(),
         Json(payload_future),
     )
     .await
@@ -345,6 +353,7 @@ async fn test_sla_urgency_ordering() {
     let Json(comm_no_due) = create_commission(
         State(ctx.state.clone()),
         ctx.user_a.clone(),
+        HeaderMap::new(),
         Json(payload_no_due),
     )
     .await
@@ -353,6 +362,7 @@ async fn test_sla_urgency_ordering() {
     let Json(comm_urgent) = create_commission(
         State(ctx.state.clone()),
         ctx.user_a.clone(),
+        HeaderMap::new(),
         Json(payload_urgent),
     )
     .await

@@ -1,8 +1,10 @@
 use axum::{
     extract::{Query, State},
+    http::HeaderMap,
     Json,
 };
 use serde::Deserialize;
+use crate::audit::AuditLogger;
 use crate::auth::AuthUser;
 use crate::error::Result;
 use crate::models::{
@@ -19,6 +21,7 @@ pub struct SyncPullQuery {
 pub async fn sync_push(
     State(state): State<AppState>,
     auth_user: AuthUser,
+    headers: HeaderMap,
     Json(payload): Json<SyncPushRequest>,
 ) -> Result<Json<SyncPushResponse>> {
     let now = current_time_millis();
@@ -147,6 +150,21 @@ pub async fn sync_push(
         accepted_update_ids.push(update.id);
     }
 
+    AuditLogger::log(
+        &state.db,
+        Some(&auth_user.user_id),
+        None,
+        "SYNC_PUSH",
+        "sync",
+        None,
+        Some(&serde_json::json!({
+            "accepted_commissions": accepted_commission_ids.len(),
+            "accepted_updates": accepted_update_ids.len(),
+        })),
+        Some(&headers),
+    )
+    .await?;
+
     Ok(Json(SyncPushResponse {
         accepted_commission_ids,
         accepted_update_ids,
@@ -157,6 +175,7 @@ pub async fn sync_push(
 pub async fn sync_pull(
     State(state): State<AppState>,
     auth_user: AuthUser,
+    headers: HeaderMap,
     Query(query): Query<SyncPullQuery>,
 ) -> Result<Json<SyncPullResponse>> {
     let now = current_time_millis();
@@ -203,6 +222,23 @@ pub async fn sync_pull(
     .bind(&auth_user.user_id)
     .bind(since)
     .fetch_all(&state.db)
+    .await?;
+
+    AuditLogger::log(
+        &state.db,
+        Some(&auth_user.user_id),
+        None,
+        "SYNC_PULL",
+        "sync",
+        None,
+        Some(&serde_json::json!({
+            "since": since,
+            "commissions_count": commissions.len(),
+            "updates_count": updates.len(),
+            "media_count": media.len(),
+        })),
+        Some(&headers),
+    )
     .await?;
 
     Ok(Json(SyncPullResponse {

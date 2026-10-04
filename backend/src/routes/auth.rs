@@ -1,4 +1,5 @@
-use axum::{extract::State, Json};
+use axum::{extract::State, http::HeaderMap, Json};
+use crate::audit::AuditLogger;
 use crate::auth::{create_jwt, AuthUser};
 use crate::error::{AppError, Result};
 use crate::models::{current_time_millis, new_uuid, AuthResponse, GoogleAuthRequest, User};
@@ -6,12 +7,26 @@ use crate::AppState;
 
 pub async fn google_login(
     State(state): State<AppState>,
+    headers: HeaderMap,
     Json(payload): Json<GoogleAuthRequest>,
 ) -> Result<Json<AuthResponse>> {
-    let token_info = state
-        .google_verifier
-        .verify_id_token(&payload.id_token)
-        .await?;
+    let token_info = match state.google_verifier.verify_id_token(&payload.id_token).await {
+        Ok(info) => info,
+        Err(e) => {
+            let _ = AuditLogger::log(
+                &state.db,
+                None,
+                None,
+                "AUTH_LOGIN_FAILURE",
+                "auth",
+                None,
+                Some(&serde_json::json!({ "reason": e.to_string() })),
+                Some(&headers),
+            )
+            .await;
+            return Err(e);
+        }
+    };
 
     let now = current_time_millis();
 
@@ -22,6 +37,8 @@ pub async fn google_login(
     .bind(&token_info.sub)
     .fetch_optional(&state.db)
     .await?;
+
+    let is_new_user = existing_user.is_none();
 
     let user = match existing_user {
         Some(user) => {
@@ -70,6 +87,21 @@ pub async fn google_login(
     };
 
     let token = create_jwt(&user.id, &user.email, &state.config.jwt_secret)?;
+
+    AuditLogger::log(
+        &state.db,
+        Some(&user.id),
+        Some(&user.email),
+        "AUTH_LOGIN_SUCCESS",
+        "user",
+        Some(&user.id),
+        Some(&serde_json::json!({
+            "google_sub": user.google_sub,
+            "is_new_user": is_new_user,
+        })),
+        Some(&headers),
+    )
+    .await?;
 
     Ok(Json(AuthResponse { token, user }))
 }

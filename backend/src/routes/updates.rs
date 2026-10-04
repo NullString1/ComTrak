@@ -1,7 +1,9 @@
 use axum::{
     extract::{Path, State},
+    http::HeaderMap,
     Json,
 };
+use crate::audit::AuditLogger;
 use crate::auth::AuthUser;
 use crate::error::{AppError, Result};
 use crate::models::{
@@ -45,6 +47,7 @@ pub async fn list_updates(
 pub async fn add_update(
     State(state): State<AppState>,
     auth_user: AuthUser,
+    headers: HeaderMap,
     Path(commission_id): Path<String>,
     Json(payload): Json<CreateUpdateRequest>,
 ) -> Result<Json<CommissionUpdate>> {
@@ -124,5 +127,66 @@ pub async fn add_update(
     .fetch_one(&state.db)
     .await?;
 
+    AuditLogger::log(
+        &state.db,
+        Some(&auth_user.user_id),
+        None,
+        "UPDATE_CREATE",
+        "commission_update",
+        Some(&id),
+        Some(&serde_json::json!({
+            "commission_id": commission_id,
+            "from_status": update.from_status,
+            "to_status": update.to_status,
+            "note": update.note,
+        })),
+        Some(&headers),
+    )
+    .await?;
+
     Ok(Json(update))
+}
+
+pub async fn delete_update(
+    State(state): State<AppState>,
+    auth_user: AuthUser,
+    headers: HeaderMap,
+    Path((commission_id, update_id)): Path<(String, String)>,
+) -> Result<Json<serde_json::Value>> {
+    let now = current_time_millis();
+
+    let result = sqlx::query(
+        "UPDATE commission_updates SET deleted_at = $1 WHERE id = $2 AND commission_id = $3 AND user_id = $4 AND deleted_at IS NULL",
+    )
+    .bind(now)
+    .bind(&update_id)
+    .bind(&commission_id)
+    .bind(&auth_user.user_id)
+    .execute(&state.db)
+    .await?;
+
+    if result.rows_affected() == 0 {
+        return Err(AppError::NotFound(format!("Update '{}' not found", update_id)));
+    }
+
+    AuditLogger::log(
+        &state.db,
+        Some(&auth_user.user_id),
+        None,
+        "UPDATE_SOFT_DELETE",
+        "commission_update",
+        Some(&update_id),
+        Some(&serde_json::json!({
+            "commission_id": commission_id,
+            "deleted_at": now
+        })),
+        Some(&headers),
+    )
+    .await?;
+
+    Ok(Json(serde_json::json!({
+        "success": true,
+        "id": update_id,
+        "deleted_at": now
+    })))
 }

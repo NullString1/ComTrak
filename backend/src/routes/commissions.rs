@@ -1,7 +1,9 @@
 use axum::{
     extract::{Path, State},
+    http::HeaderMap,
     Json,
 };
+use crate::audit::AuditLogger;
 use crate::auth::AuthUser;
 use crate::error::{AppError, Result};
 use crate::models::{
@@ -36,6 +38,7 @@ pub async fn list_commissions(
 pub async fn create_commission(
     State(state): State<AppState>,
     auth_user: AuthUser,
+    headers: HeaderMap,
     Json(payload): Json<CreateCommissionRequest>,
 ) -> Result<Json<Commission>> {
     let now = current_time_millis();
@@ -91,6 +94,23 @@ pub async fn create_commission(
     .fetch_one(&state.db)
     .await?;
 
+    AuditLogger::log(
+        &state.db,
+        Some(&auth_user.user_id),
+        None,
+        "COMMISSION_CREATE",
+        "commission",
+        Some(&id),
+        Some(&serde_json::json!({
+            "title": commission.title,
+            "customer_name": commission.customer_name,
+            "status": commission.status,
+            "quantity": commission.quantity,
+        })),
+        Some(&headers),
+    )
+    .await?;
+
     Ok(Json(commission))
 }
 
@@ -120,6 +140,7 @@ pub async fn get_commission(
 pub async fn update_commission(
     State(state): State<AppState>,
     auth_user: AuthUser,
+    headers: HeaderMap,
     Path(id): Path<String>,
     Json(payload): Json<UpdateCommissionRequest>,
 ) -> Result<Json<Commission>> {
@@ -191,12 +212,29 @@ pub async fn update_commission(
     .fetch_one(&state.db)
     .await?;
 
+    AuditLogger::log(
+        &state.db,
+        Some(&auth_user.user_id),
+        None,
+        "COMMISSION_UPDATE",
+        "commission",
+        Some(&id),
+        Some(&serde_json::json!({
+            "version": updated.version,
+            "status": updated.status,
+            "title": updated.title,
+        })),
+        Some(&headers),
+    )
+    .await?;
+
     Ok(Json(updated))
 }
 
 pub async fn delete_commission(
     State(state): State<AppState>,
     auth_user: AuthUser,
+    headers: HeaderMap,
     Path(id): Path<String>,
 ) -> Result<Json<serde_json::Value>> {
     let now = current_time_millis();
@@ -213,6 +251,37 @@ pub async fn delete_commission(
     if result.rows_affected() == 0 {
         return Err(AppError::NotFound(format!("Commission '{}' not found", id)));
     }
+
+    // Cascade soft delete to associated updates and media
+    sqlx::query(
+        "UPDATE commission_updates SET deleted_at = $1 WHERE commission_id = $2 AND user_id = $3 AND deleted_at IS NULL",
+    )
+    .bind(now)
+    .bind(&id)
+    .bind(&auth_user.user_id)
+    .execute(&state.db)
+    .await?;
+
+    sqlx::query(
+        "UPDATE media_attachments SET deleted_at = $1 WHERE commission_id = $2 AND user_id = $3 AND deleted_at IS NULL",
+    )
+    .bind(now)
+    .bind(&id)
+    .bind(&auth_user.user_id)
+    .execute(&state.db)
+    .await?;
+
+    AuditLogger::log(
+        &state.db,
+        Some(&auth_user.user_id),
+        None,
+        "COMMISSION_SOFT_DELETE",
+        "commission",
+        Some(&id),
+        Some(&serde_json::json!({ "deleted_at": now })),
+        Some(&headers),
+    )
+    .await?;
 
     Ok(Json(serde_json::json!({
         "success": true,
