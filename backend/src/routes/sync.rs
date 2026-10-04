@@ -25,19 +25,25 @@ pub async fn sync_push(
     let mut accepted_commission_ids = Vec::new();
     let mut accepted_update_ids = Vec::new();
 
-    // 1. Process Commissions with Last-Write-Wins
+    // 1. Process Commissions with Last-Write-Wins and Multi-tenant Validation
     for comm in payload.commissions {
-        let existing = sqlx::query_as::<_, (i64, i64)>(
-            "SELECT updated_at, version FROM commissions WHERE id = $1 AND user_id = $2",
+        let existing = sqlx::query_as::<_, (String, i64, i64)>(
+            "SELECT user_id, updated_at, version FROM commissions WHERE id = $1",
         )
         .bind(&comm.id)
-        .bind(&auth_user.user_id)
         .fetch_optional(&state.db)
         .await?;
 
         let should_apply = match existing {
-            None => true,
-            Some((existing_updated_at, _)) => comm.updated_at >= existing_updated_at,
+            None => true, // Brand new commission
+            Some((owner_id, existing_updated_at, _)) => {
+                // Reject if existing commission belongs to a different user
+                if owner_id != auth_user.user_id {
+                    false
+                } else {
+                    comm.updated_at >= existing_updated_at
+                }
+            }
         };
 
         if should_apply {
@@ -71,7 +77,7 @@ pub async fn sync_push(
                     updated_at = excluded.updated_at,
                     deleted_at = excluded.deleted_at,
                     version = commissions.version + 1
-                WHERE excluded.updated_at >= commissions.updated_at
+                WHERE excluded.updated_at >= commissions.updated_at AND commissions.user_id = excluded.user_id
                 "#,
             )
             .bind(&comm.id)
@@ -102,8 +108,20 @@ pub async fn sync_push(
         }
     }
 
-    // 2. Process Updates
+    // 2. Process Updates with Multi-tenant Validation
     for update in payload.updates {
+        // Verify parent commission belongs to the user
+        let parent_owner = sqlx::query_scalar::<_, String>(
+            "SELECT user_id FROM commissions WHERE id = $1",
+        )
+        .bind(&update.commission_id)
+        .fetch_optional(&state.db)
+        .await?;
+
+        if parent_owner.as_deref() != Some(&auth_user.user_id) {
+            continue;
+        }
+
         sqlx::query(
             r#"
             INSERT INTO commission_updates (
@@ -112,6 +130,7 @@ pub async fn sync_push(
             ON CONFLICT(id) DO UPDATE SET
                 note = excluded.note,
                 deleted_at = excluded.deleted_at
+            WHERE commission_updates.user_id = excluded.user_id
             "#,
         )
         .bind(&update.id)

@@ -1,27 +1,13 @@
-mod auth;
-mod config;
-mod db;
-mod error;
-mod models;
-mod routes;
-mod storage;
-
 use std::sync::Arc;
 use tokio::net::TcpListener;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
-use crate::auth::GoogleVerifier;
-use crate::config::AppConfig;
-use crate::db::{init_db, DbPool};
-use crate::storage::StorageService;
-
-#[derive(Clone)]
-pub struct AppState {
-    pub db: DbPool,
-    pub storage: StorageService,
-    pub config: Arc<AppConfig>,
-    pub google_verifier: Arc<GoogleVerifier>,
-}
+use comtrak_backend::auth::GoogleVerifier;
+use comtrak_backend::config::AppConfig;
+use comtrak_backend::db::init_db;
+use comtrak_backend::routes;
+use comtrak_backend::storage::StorageService;
+use comtrak_backend::AppState;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {

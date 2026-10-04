@@ -6,11 +6,11 @@ plugins {
 }
 
 android {
-    namespace = "com.comtrak.app"
+    namespace = "one.nullstring.ComTrak"
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "com.comtrak.app"
+        applicationId = "one.nullstring.ComTrak"
         minSdk = 26
         targetSdk = 35
         versionCode = 1

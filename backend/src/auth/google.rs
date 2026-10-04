@@ -26,7 +26,8 @@ impl GoogleVerifier {
     pub async fn verify_id_token(&self, id_token: &str) -> Result<GoogleTokenInfo> {
         // In local development/testing without internet or without client_id, allow mock token
         if id_token.starts_with("mock_dev_token_") {
-            let user_suffix = id_token.strip_prefix("mock_dev_token_").unwrap_or("dev");
+            let suffix = id_token.strip_prefix("mock_dev_token_").unwrap_or("");
+            let user_suffix = if suffix.is_empty() { "dev" } else { suffix };
             return Ok(GoogleTokenInfo {
                 sub: format!("google_sub_{}", user_suffix),
                 email: format!("{}@example.com", user_suffix),
