@@ -44,6 +44,7 @@ import androidx.credentials.exceptions.GetCredentialException
 import com.google.android.libraries.identity.googleid.GetGoogleIdOption
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
 import kotlinx.coroutines.launch
+import one.nullstring.ComTrak.BuildConfig
 
 @Composable
 fun LoginScreen(
@@ -150,38 +151,44 @@ fun LoginScreen(
 
                 Spacer(modifier = Modifier.height(14.dp))
 
-                // Developer / Local test mode login
-                OutlinedButton(
-                    onClick = { viewModel.devBypassLogin(onLoginSuccess) },
-                    modifier = Modifier.fillMaxWidth().height(48.dp),
-                    shape = RoundedCornerShape(10.dp),
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.secondary)
-                ) {
-                    Icon(Icons.Default.Build, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(modifier = Modifier.size(8.dp))
-                    Text("Dev Studio Bypass (Offline & Local)")
+                // Developer / Local test mode login — debug builds only, never in production.
+                if (BuildConfig.DEBUG) {
+                    OutlinedButton(
+                        onClick = { viewModel.devBypassLogin(onLoginSuccess) },
+                        modifier = Modifier.fillMaxWidth().height(48.dp),
+                        shape = RoundedCornerShape(10.dp),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.secondary)
+                    ) {
+                        Icon(Icons.Default.Build, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.size(8.dp))
+                        Text("Dev Studio Bypass (Offline & Local)")
+                    }
                 }
             }
 
-            Spacer(modifier = Modifier.height(24.dp))
+            // Backend host override — debug builds only; release always uses the
+            // compiled-in production URL.
+            if (BuildConfig.DEBUG) {
+                Spacer(modifier = Modifier.height(24.dp))
 
-            // Server settings toggle
-            OutlinedButton(
-                onClick = { showServerSettings = !showServerSettings },
-                shape = RoundedCornerShape(8.dp)
-            ) {
-                Text(if (showServerSettings) "Hide Server URL" else "Configure Backend Host")
-            }
+                // Server settings toggle
+                OutlinedButton(
+                    onClick = { showServerSettings = !showServerSettings },
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Text(if (showServerSettings) "Hide Server URL" else "Configure Backend Host")
+                }
 
-            if (showServerSettings) {
-                Spacer(modifier = Modifier.height(12.dp))
-                OutlinedTextField(
-                    value = serverUrl,
-                    onValueChange = { viewModel.onServerUrlChanged(it) },
-                    label = { Text("Backend URL (e.g. http://100.113.172.90:8080)") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
-                )
+                if (showServerSettings) {
+                    Spacer(modifier = Modifier.height(12.dp))
+                    OutlinedTextField(
+                        value = serverUrl,
+                        onValueChange = { viewModel.onServerUrlChanged(it) },
+                        label = { Text("Backend URL (e.g. https://comtrak.nullstring.one)") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
             }
         }
     }

@@ -152,6 +152,8 @@ pub struct MediaUploadResponse {
 pub struct SyncPushRequest {
     pub commissions: Vec<CommissionSyncItem>,
     pub updates: Vec<CommissionUpdateSyncItem>,
+    #[serde(default)]
+    pub media: Vec<MediaAttachment>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -193,6 +195,7 @@ pub struct CommissionUpdateSyncItem {
 pub struct SyncPushResponse {
     pub accepted_commission_ids: Vec<String>,
     pub accepted_update_ids: Vec<String>,
+    pub accepted_media_ids: Vec<String>,
     pub server_time: i64,
 }
 

@@ -15,6 +15,7 @@ android/build/
 android/app/build/
 *.apk
 *.aab
+release.keystore
 local.properties
 .idea/
 *.iml
@@ -34,3 +35,7 @@ backend/dev.db*
 # OS files
 .DS_Store
 Thumbs.db
+
+# Agent instructions & skills
+.agents/
+AGENTS.md

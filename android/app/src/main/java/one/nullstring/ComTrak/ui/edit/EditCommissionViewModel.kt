@@ -13,10 +13,10 @@ import kotlinx.coroutines.launch
 
 class EditCommissionViewModel(
     application: Application,
-    private val existingId: String?
+    private val existingId: String?,
+    private val repository: CommissionRepository = CommissionRepository(application)
 ) : AndroidViewModel(application) {
 
-    private val repository = CommissionRepository(application)
     private val imageProcessor = ImageProcessor(application)
 
     val title = MutableStateFlow("")
@@ -95,27 +95,47 @@ class EditCommissionViewModel(
                         glazes = glazes.value.trim().ifEmpty { null }
                     )
                 } else {
-                    val existing = repository.getCommissionById(existingId)
-                    val updated = CommissionEntity(
-                        id = existingId,
-                        title = title.value.trim(),
-                        description = description.value.trim().ifEmpty { null },
-                        customerName = customerName.value.trim(),
-                        customerPhone = customerPhone.value.trim().ifEmpty { null },
-                        customerEmail = customerEmail.value.trim().ifEmpty { null },
-                        itemName = itemName.value.trim(),
-                        size = size.value.trim().ifEmpty { null },
-                        colour = colour.value.trim().ifEmpty { null },
-                        quantity = qty,
-                        priceCents = priceCents,
-                        dueDate = dueDateEpoch.value,
-                        status = status.value,
-                        clayBody = clayBody.value.trim().ifEmpty { null },
-                        glazes = glazes.value.trim().ifEmpty { null },
-                        thumbnailMediaId = null,
-                        createdAt = System.currentTimeMillis(),
-                        updatedAt = System.currentTimeMillis()
-                    )
+                    val existing = repository.getCommissionDirect(existingId)
+                    val updated = if (existing != null) {
+                        existing.copy(
+                            title = title.value.trim(),
+                            description = description.value.trim().ifEmpty { null },
+                            customerName = customerName.value.trim(),
+                            customerPhone = customerPhone.value.trim().ifEmpty { null },
+                            customerEmail = customerEmail.value.trim().ifEmpty { null },
+                            itemName = itemName.value.trim(),
+                            size = size.value.trim().ifEmpty { null },
+                            colour = colour.value.trim().ifEmpty { null },
+                            quantity = qty,
+                            priceCents = priceCents,
+                            dueDate = dueDateEpoch.value,
+                            status = status.value,
+                            clayBody = clayBody.value.trim().ifEmpty { null },
+                            glazes = glazes.value.trim().ifEmpty { null },
+                            updatedAt = System.currentTimeMillis()
+                        )
+                    } else {
+                        CommissionEntity(
+                            id = existingId,
+                            title = title.value.trim(),
+                            description = description.value.trim().ifEmpty { null },
+                            customerName = customerName.value.trim(),
+                            customerPhone = customerPhone.value.trim().ifEmpty { null },
+                            customerEmail = customerEmail.value.trim().ifEmpty { null },
+                            itemName = itemName.value.trim(),
+                            size = size.value.trim().ifEmpty { null },
+                            colour = colour.value.trim().ifEmpty { null },
+                            quantity = qty,
+                            priceCents = priceCents,
+                            dueDate = dueDateEpoch.value,
+                            status = status.value,
+                            clayBody = clayBody.value.trim().ifEmpty { null },
+                            glazes = glazes.value.trim().ifEmpty { null },
+                            thumbnailMediaId = null,
+                            createdAt = System.currentTimeMillis(),
+                            updatedAt = System.currentTimeMillis()
+                        )
+                    }
                     repository.updateCommission(updated)
                     existingId
                 }

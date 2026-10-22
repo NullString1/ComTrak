@@ -119,12 +119,14 @@ data class MediaUploadResponseDto(
 
 data class SyncPushRequestDto(
     val commissions: List<CommissionDto>,
-    val updates: List<CommissionUpdateDto>
+    val updates: List<CommissionUpdateDto>,
+    val media: List<MediaAttachmentDto> = emptyList()
 )
 
 data class SyncPushResponseDto(
     val accepted_commission_ids: List<String>,
     val accepted_update_ids: List<String>,
+    val accepted_media_ids: List<String> = emptyList(),
     val server_time: Long
 )
 

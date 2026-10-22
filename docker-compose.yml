@@ -47,9 +47,9 @@ services:
       - GARAGE_ENDPOINT=http://garage:3900
       - GARAGE_REGION=garage
       - GARAGE_BUCKET=comtrak-media
-      - GARAGE_ACCESS_KEY=GK67b688efc14709ffdec5f6d4
-      - GARAGE_SECRET_KEY=0147a79d361b583c2cff56ad368e56185d29c963a4bda02c0617be1f1205aac7
-      - JWT_SECRET=change-me-to-a-secure-random-secret-in-production-123456
+      - GARAGE_ACCESS_KEY=${GARAGE_ACCESS_KEY:-GK67b688efc14709ffdec5f6d4}
+      - GARAGE_SECRET_KEY=${GARAGE_SECRET_KEY:-0147a79d361b583c2cff56ad368e56185d29c963a4bda02c0617be1f1205aac7}
+      - JWT_SECRET=${JWT_SECRET:-change-me-to-a-secure-random-secret-in-production-123456}
       - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID:-41678569293-ct8rne7f2obihcs35ig359e460bn6sse.apps.googleusercontent.com}
       - RUST_LOG=info,comtrak_backend=debug
 

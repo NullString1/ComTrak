@@ -1,6 +1,7 @@
 package one.nullstring.ComTrak.data.repository
 
 import android.content.Context
+import android.util.Log
 import androidx.work.Constraints
 import androidx.work.ExistingWorkPolicy
 import androidx.work.NetworkType
@@ -14,12 +15,15 @@ import one.nullstring.ComTrak.data.sync.SyncWorker
 import kotlinx.coroutines.flow.Flow
 import java.util.UUID
 
-class CommissionRepository(private val context: Context) {
+class CommissionRepository(
+    private val context: Context,
+    db: AppDatabase? = null
+) {
 
-    private val db = AppDatabase.getInstance(context)
-    private val commissionDao = db.commissionDao()
-    private val updateDao = db.commissionUpdateDao()
-    private val mediaDao = db.mediaAttachmentDao()
+    private val database: AppDatabase = db ?: AppDatabase.getInstance(context)
+    private val commissionDao = database.commissionDao()
+    private val updateDao = database.commissionUpdateDao()
+    private val mediaDao = database.mediaAttachmentDao()
 
     // 1. Reactive Queries for UI (Single Source of Truth)
     fun getAllCommissions(): Flow<List<CommissionEntity>> = commissionDao.getAllCommissionsSortedBySla()
@@ -76,7 +80,7 @@ class CommissionRepository(private val context: Context) {
             deletedLocally = false
         )
 
-        commissionDao.insertOrUpdate(entity)
+        commissionDao.upsertCommission(entity)
         scheduleSync()
         return id
     }
@@ -87,9 +91,12 @@ class CommissionRepository(private val context: Context) {
             version = commission.version + 1,
             syncPending = true
         )
-        commissionDao.insertOrUpdate(updated)
+        commissionDao.upsertCommission(updated)
         scheduleSync()
     }
+
+    suspend fun getCommissionDirect(id: String): CommissionEntity? =
+        commissionDao.getCommissionDirect(id)
 
     suspend fun deleteCommission(id: String) {
         val now = System.currentTimeMillis()
@@ -132,12 +139,12 @@ class CommissionRepository(private val context: Context) {
                 version = comm.version + 1,
                 syncPending = true
             )
-            commissionDao.insertOrUpdate(updatedComm)
+            commissionDao.upsertCommission(updatedComm)
         }
 
         // Link media attachments to this update
         attachedMediaIds.forEach { mediaId ->
-            // Update media attachment row
+            mediaDao.setUpdateId(mediaId, updateId)
         }
 
         scheduleSync()
@@ -161,14 +168,18 @@ class CommissionRepository(private val context: Context) {
             remoteUrl = null,
             fileSizeBytes = fileSizeBytes,
             uploadStatus = "PENDING",
-            createdAt = System.currentTimeMillis()
+            createdAt = System.currentTimeMillis(),
+            syncPending = true
         )
         mediaDao.insertOrUpdate(entity)
 
-        // If commission has no thumbnail yet, assign this media
+        // Thumbnail rule: latest progress photo wins; the new media is thumbnail
+        // only if no progress photos exist (reference-only case).
         commissionDao.getCommissionDirect(commissionId)?.let { comm ->
-            if (comm.thumbnailMediaId == null) {
-                commissionDao.insertOrUpdate(comm.copy(thumbnailMediaId = id, syncPending = true))
+            val latestProgressId = mediaDao.getLatestProgressId(commissionId)
+            val newThumbnailId = latestProgressId ?: id
+            if (comm.thumbnailMediaId != newThumbnailId) {
+                commissionDao.upsertCommission(comm.copy(thumbnailMediaId = newThumbnailId, syncPending = true))
             }
         }
 
@@ -176,18 +187,29 @@ class CommissionRepository(private val context: Context) {
     }
 
     fun scheduleSync() {
-        val constraints = Constraints.Builder()
-            .setRequiredNetworkType(NetworkType.CONNECTED)
-            .build()
+        try {
+            val constraints = Constraints.Builder()
+                .setRequiredNetworkType(NetworkType.CONNECTED)
+                .build()
 
-        val syncRequest = OneTimeWorkRequestBuilder<SyncWorker>()
-            .setConstraints(constraints)
-            .build()
+            val syncRequest = OneTimeWorkRequestBuilder<SyncWorker>()
+                .setConstraints(constraints)
+                .build()
 
-        WorkManager.getInstance(context).enqueueUniqueWork(
-            "ComTrak_Opportunistic_Sync",
-            ExistingWorkPolicy.REPLACE,
-            syncRequest
-        )
+            WorkManager.getInstance(context).enqueueUniqueWork(
+                "ComTrak_Opportunistic_Sync",
+                ExistingWorkPolicy.REPLACE,
+                syncRequest
+            )
+        } catch (e: IllegalStateException) {
+            // WorkManager isn't initialized (e.g. hermetic unit tests running
+            // against an in-memory db). Mutations stay durable via the
+            // syncPending flags and sync on the next scheduled trigger.
+            Log.w(TAG, "WorkManager unavailable, sync remains queued: ${e.message}")
+        }
+    }
+
+    companion object {
+        private const val TAG = "CommissionRepository"
     }
 }

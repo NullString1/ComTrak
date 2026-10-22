@@ -27,6 +27,7 @@ pub async fn sync_push(
     let now = current_time_millis();
     let mut accepted_commission_ids = Vec::new();
     let mut accepted_update_ids = Vec::new();
+    let mut accepted_media_ids = Vec::new();
 
     // 1. Process Commissions with Last-Write-Wins and Multi-tenant Validation
     for comm in payload.commissions {
@@ -150,6 +151,96 @@ pub async fn sync_push(
         accepted_update_ids.push(update.id);
     }
 
+    // 3. Process Media metadata with Multi-tenant Validation.
+    // Best-effort path: files still upload via /api/v1/media/upload.
+    // This upsert must be idempotent and must NEVER regress an uploaded row
+    // (with s3_key/mime_type/file_size_bytes set) back to metadata-only.
+    for media in payload.media {
+        // Verify parent commission belongs to the user
+        let parent_owner = sqlx::query_scalar::<_, String>(
+            "SELECT user_id FROM commissions WHERE id = $1",
+        )
+        .bind(&media.commission_id)
+        .fetch_optional(&state.db)
+        .await?;
+
+        if parent_owner.as_deref() != Some(&auth_user.user_id) {
+            continue;
+        }
+
+        // Reject rows whose id is already owned by someone else
+        let existing_owner = sqlx::query_scalar::<_, String>(
+            "SELECT user_id FROM media_attachments WHERE id = $1",
+        )
+        .bind(&media.id)
+        .fetch_optional(&state.db)
+        .await?;
+
+        if let Some(owner) = existing_owner {
+            if owner != auth_user.user_id {
+                continue;
+            }
+        }
+
+        // Avoid FK violation on dangling update_id: null it out when the
+        // referenced update does not exist.
+        let update_id = match &media.update_id {
+            Some(uid) => {
+                let exists = sqlx::query_scalar::<_, i64>(
+                    "SELECT COUNT(1) FROM commission_updates WHERE id = $1",
+                )
+                .bind(uid)
+                .fetch_one(&state.db)
+                .await?;
+                if exists > 0 { Some(uid.clone()) } else { None }
+            }
+            None => None,
+        };
+
+        sqlx::query(
+            r#"
+            INSERT INTO media_attachments (
+                id, user_id, commission_id, update_id, media_type, s3_key,
+                mime_type, width, height, file_size_bytes, created_at, deleted_at
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+            ON CONFLICT(id) DO UPDATE SET
+                media_type = excluded.media_type,
+                update_id = excluded.update_id,
+                width = excluded.width,
+                height = excluded.height,
+                s3_key = CASE
+                    WHEN media_attachments.s3_key IS NULL OR media_attachments.s3_key = ''
+                    THEN excluded.s3_key
+                    ELSE media_attachments.s3_key
+                END,
+                mime_type = CASE
+                    WHEN media_attachments.mime_type IS NULL OR media_attachments.mime_type = ''
+                    THEN excluded.mime_type
+                    ELSE media_attachments.mime_type
+                END,
+                file_size_bytes = COALESCE(media_attachments.file_size_bytes, excluded.file_size_bytes),
+                deleted_at = excluded.deleted_at
+            WHERE media_attachments.user_id = excluded.user_id
+            "#,
+        )
+        .bind(&media.id)
+        .bind(&auth_user.user_id)
+        .bind(&media.commission_id)
+        .bind(&update_id)
+        .bind(&media.media_type)
+        .bind(&media.s3_key)
+        .bind(&media.mime_type)
+        .bind(media.width)
+        .bind(media.height)
+        .bind(media.file_size_bytes)
+        .bind(media.created_at)
+        .bind(media.deleted_at)
+        .execute(&state.db)
+        .await?;
+
+        accepted_media_ids.push(media.id);
+    }
+
     AuditLogger::log(
         &state.db,
         Some(&auth_user.user_id),
@@ -160,6 +251,7 @@ pub async fn sync_push(
         Some(&serde_json::json!({
             "accepted_commissions": accepted_commission_ids.len(),
             "accepted_updates": accepted_update_ids.len(),
+            "accepted_media": accepted_media_ids.len(),
         })),
         Some(&headers),
     )
@@ -168,6 +260,7 @@ pub async fn sync_push(
     Ok(Json(SyncPushResponse {
         accepted_commission_ids,
         accepted_update_ids,
+        accepted_media_ids,
         server_time: now,
     }))
 }

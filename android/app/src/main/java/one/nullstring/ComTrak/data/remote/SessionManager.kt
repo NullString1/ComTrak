@@ -47,8 +47,8 @@ class SessionManager(context: Context) {
         private const val KEY_BASE_URL = "base_url"
         private const val KEY_LAST_SYNCED_AT = "last_synced_at"
 
-        // Default to development server address on Tailscale network
-        const val DEFAULT_BASE_URL = "http://100.113.172.90:8080"
+        // Default to the production API; the login screen allows overriding.
+        const val DEFAULT_BASE_URL = "https://comtrak.nullstring.one"
     }
 }
 

@@ -1,10 +1,9 @@
 package one.nullstring.ComTrak.data.local.dao
 
 import androidx.room.Dao
-import androidx.room.Insert
-import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Update
+import androidx.room.Upsert
 import one.nullstring.ComTrak.data.local.entities.CommissionEntity
 import kotlinx.coroutines.flow.Flow
 
@@ -30,11 +29,14 @@ interface CommissionDao {
     @Query("SELECT * FROM commissions WHERE syncPending = 1 OR deletedLocally = 1")
     suspend fun getPendingSyncCommissions(): List<CommissionEntity>
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertOrUpdate(commission: CommissionEntity)
+    // Non-destructive upsert: @Upsert performs INSERT-or-UPDATE in place,
+    // unlike REPLACE (DELETE+INSERT) which would cascade-delete child
+    // commission_updates and media_attachments rows.
+    @Upsert
+    suspend fun upsertCommission(commission: CommissionEntity)
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertOrUpdateAll(commissions: List<CommissionEntity>)
+    @Upsert
+    suspend fun upsertAll(commissions: List<CommissionEntity>)
 
     @Query("UPDATE commissions SET deletedLocally = 1, deletedAt = :now, updatedAt = :now, syncPending = 1 WHERE id = :id")
     suspend fun markDeletedLocally(id: String, now: Long = System.currentTimeMillis())

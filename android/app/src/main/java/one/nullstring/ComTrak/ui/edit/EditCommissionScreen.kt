@@ -58,6 +58,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
@@ -67,6 +68,35 @@ import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
 import java.util.Locale
+
+/**
+ * Label used by every field on the create/edit form.
+ *
+ * Rendered at Material's standard single-line label size so:
+ * - a label never wraps by accident — "Size / Dimensions" and "Quantity" etc. all sit on
+ *   one line, which keeps the Quantity|Price and Size|Target Colour rows exactly the same
+ *   height with their boxes aligned top and bottom;
+ * - empty and filled fields show the label at the same size, so nothing jumps when the
+ *   built-in floating animation moves the label to the notch (the resting label used to be
+ *   15sp while the floated one was 12sp, which read as two different label styles).
+ *
+ * Labels that carry a long "e.g. ..." example phrase pass [singleLine] = false: they are
+ * all full-width fields, so letting them wrap when the user scales system text up keeps the
+ * full hint visible and cannot knock a paired row out of alignment.
+ */
+@Composable
+private fun FieldLabel(text: String, singleLine: Boolean = true) {
+    if (singleLine) {
+        Text(
+            text = text,
+            style = MaterialTheme.typography.labelMedium,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+    } else {
+        Text(text = text, style = MaterialTheme.typography.labelMedium)
+    }
+}
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
@@ -153,7 +183,7 @@ fun EditCommissionScreen(
                     OutlinedTextField(
                         value = title,
                         onValueChange = { viewModel.title.value = it },
-                        label = { Text("Project Title * (e.g. Set of 4 Ramen Bowls)") },
+                        label = { FieldLabel("Project Title * (e.g. Set of 4 Ramen Bowls)", singleLine = false) },
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true
                     )
@@ -161,7 +191,7 @@ fun EditCommissionScreen(
                     OutlinedTextField(
                         value = itemName,
                         onValueChange = { viewModel.itemName.value = it },
-                        label = { Text("Item Name * (e.g. Ramen Bowl)") },
+                        label = { FieldLabel("Item Name * (e.g. Ramen Bowl)", singleLine = false) },
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true
                     )
@@ -170,7 +200,7 @@ fun EditCommissionScreen(
                         OutlinedTextField(
                             value = quantity,
                             onValueChange = { viewModel.quantity.value = it },
-                            label = { Text("Quantity") },
+                            label = { FieldLabel("Quantity") },
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                             modifier = Modifier.weight(1f),
                             singleLine = true
@@ -179,7 +209,7 @@ fun EditCommissionScreen(
                         OutlinedTextField(
                             value = price,
                             onValueChange = { viewModel.price.value = it },
-                            label = { Text("Price ($)") },
+                            label = { FieldLabel("Price ($)") },
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                             modifier = Modifier.weight(1f),
                             singleLine = true
@@ -190,7 +220,7 @@ fun EditCommissionScreen(
                         OutlinedTextField(
                             value = size,
                             onValueChange = { viewModel.size.value = it },
-                            label = { Text("Size / Dimensions") },
+                            label = { FieldLabel("Size / Dimensions") },
                             modifier = Modifier.weight(1f),
                             singleLine = true
                         )
@@ -198,7 +228,7 @@ fun EditCommissionScreen(
                         OutlinedTextField(
                             value = colour,
                             onValueChange = { viewModel.colour.value = it },
-                            label = { Text("Target Colour") },
+                            label = { FieldLabel("Target Colour") },
                             modifier = Modifier.weight(1f),
                             singleLine = true
                         )
@@ -209,7 +239,7 @@ fun EditCommissionScreen(
                         value = formattedDueDate,
                         onValueChange = {},
                         readOnly = true,
-                        label = { Text("SLA / Due Date") },
+                        label = { FieldLabel("SLA / Due Date") },
                         trailingIcon = {
                             Icon(
                                 Icons.Default.CalendarToday,
@@ -291,7 +321,7 @@ fun EditCommissionScreen(
                     OutlinedTextField(
                         value = customerName,
                         onValueChange = { viewModel.customerName.value = it },
-                        label = { Text("Customer Name *") },
+                        label = { FieldLabel("Customer Name *") },
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true
                     )
@@ -299,7 +329,7 @@ fun EditCommissionScreen(
                     OutlinedTextField(
                         value = customerPhone,
                         onValueChange = { viewModel.customerPhone.value = it },
-                        label = { Text("Phone Number (optional)") },
+                        label = { FieldLabel("Phone Number (optional)") },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true
@@ -308,7 +338,7 @@ fun EditCommissionScreen(
                     OutlinedTextField(
                         value = customerEmail,
                         onValueChange = { viewModel.customerEmail.value = it },
-                        label = { Text("Email Address (optional)") },
+                        label = { FieldLabel("Email Address (optional)") },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true
@@ -328,7 +358,7 @@ fun EditCommissionScreen(
                     OutlinedTextField(
                         value = clayBody,
                         onValueChange = { viewModel.clayBody.value = it },
-                        label = { Text("Clay Body (e.g. B-Mix, Speckled Buff, Porcelain)") },
+                        label = { FieldLabel("Clay Body (e.g. B-Mix, Speckled Buff, Porcelain)", singleLine = false) },
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true
                     )
@@ -336,7 +366,7 @@ fun EditCommissionScreen(
                     OutlinedTextField(
                         value = glazes,
                         onValueChange = { viewModel.glazes.value = it },
-                        label = { Text("Glazes (e.g. Chun Plum interior, Satin Black rim)") },
+                        label = { FieldLabel("Glazes (e.g. Chun Plum interior, Satin Black rim)", singleLine = false) },
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true
                     )
@@ -344,7 +374,7 @@ fun EditCommissionScreen(
                     OutlinedTextField(
                         value = description,
                         onValueChange = { viewModel.description.value = it },
-                        label = { Text("Optional Studio Notes & Instructions") },
+                        label = { FieldLabel("Optional Studio Notes & Instructions") },
                         modifier = Modifier.fillMaxWidth(),
                         minLines = 3
                     )

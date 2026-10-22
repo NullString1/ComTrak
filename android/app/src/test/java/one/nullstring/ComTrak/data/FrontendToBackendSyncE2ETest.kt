@@ -351,4 +351,158 @@ class FrontendToBackendSyncE2ETest {
             betaItems.any { it.id == alphaCommId }
         )
     }
+
+    @Test
+    fun testEndToEnd_UpdateDeleteTombstoneInPull() = runBlocking {
+        val (token, _) = loginUser("update_tombstone_regr")
+        authToken = token
+
+        // Step 1: Create a commission and add a timeline update via the API.
+        val commissionId = "upd-tomb-comm-" + UUID.randomUUID().toString()
+        val createResp = apiService.createCommission(
+            CreateCommissionRequestDto(
+                id = commissionId,
+                title = "Tombstone Timeline Pot",
+                customer_name = "Timeline Client",
+                item_name = "Pot",
+                status = "requiring_details"
+            )
+        )
+        assertTrue(createResp.isSuccessful)
+
+        val addResp = apiService.addUpdate(
+            commissionId = commissionId,
+            body = CreateUpdateRequestDto(
+                to_status = "ready_to_begin",
+                note = "Timeline note to be deleted."
+            )
+        )
+        assertTrue(addResp.isSuccessful)
+        val updateId = addResp.body()!!.id
+
+        // Step 2: Full pull must contain the update as a live row.
+        val livePull = apiService.syncPull(since = 0)
+        assertTrue(livePull.isSuccessful)
+        val liveUpdate = livePull.body()!!.updates.find { it.id == updateId }
+        assertNotNull("Pull must contain the freshly created update", liveUpdate)
+        assertNull("Live update must have null deleted_at", liveUpdate!!.deleted_at)
+
+        // Step 3: Delete the update, then verify it disappears from listings...
+        val deleteResp = apiService.deleteUpdate(commissionId, updateId)
+        assertTrue("Delete update must succeed", deleteResp.isSuccessful)
+
+        val listResp = apiService.listUpdates(commissionId)
+        assertTrue(listResp.isSuccessful)
+        assertFalse(
+            "Deleted update must be excluded from the updates listing",
+            listResp.body()!!.any { it.id == updateId }
+        )
+
+        // ...but still surfaces in pull as a tombstone, never as a live row.
+        val tombstonePull = apiService.syncPull(since = 0)
+        assertTrue(tombstonePull.isSuccessful)
+        val allUpdates = tombstonePull.body()!!.updates
+        val tombstone = allUpdates.find { it.id == updateId }
+        assertNotNull("Pull must return a tombstone for the deleted update", tombstone)
+        assertNotNull("Tombstone must carry deleted_at", tombstone!!.deleted_at)
+        assertFalse(
+            "Deleted update must not be treated as live",
+            allUpdates.filter { it.deleted_at == null }.any { it.id == updateId }
+        )
+    }
+
+    @Test
+    fun testEndToEnd_MediaDeleteAndTombstoneInPull() = runBlocking {
+        val (token, _) = loginUser("media_tombstone_regr")
+        authToken = token
+
+        // Step 1: Create a commission and upload a WebP attachment.
+        val commissionId = "med-tomb-comm-" + UUID.randomUUID().toString()
+        val createResp = apiService.createCommission(
+            CreateCommissionRequestDto(
+                id = commissionId,
+                title = "Tombstone Media Vase",
+                customer_name = "Media Client",
+                item_name = "Vase",
+                status = "ready_to_begin"
+            )
+        )
+        assertTrue(createResp.isSuccessful)
+
+        val mediaId = UUID.randomUUID().toString()
+        val testPayload = "RIFF\u0024\u0000\u0000\u0000WEBPVP8 \u0018\u0000\u0000\u0000Tombstone Media Bytes".toByteArray()
+
+        val requestFile = testPayload.toRequestBody("image/webp".toMediaTypeOrNull())
+        val filePart = MultipartBody.Part.createFormData("file", "tombstone_detail.webp", requestFile)
+        val commIdPart = commissionId.toRequestBody("text/plain".toMediaTypeOrNull())
+        val mediaIdPart = mediaId.toRequestBody("text/plain".toMediaTypeOrNull())
+        val mediaTypePart = "progress".toRequestBody("text/plain".toMediaTypeOrNull())
+
+        val uploadResp = apiService.uploadMedia(
+            file = filePart,
+            commissionId = commIdPart,
+            mediaId = mediaIdPart,
+            mediaType = mediaTypePart
+        )
+        assertTrue("Media upload must succeed", uploadResp.isSuccessful)
+
+        // Step 2: Media is present in pull and streamable.
+        val livePull = apiService.syncPull(since = 0)
+        assertTrue(livePull.isSuccessful)
+        val liveMedia = livePull.body()!!.media.find { it.id == mediaId }
+        assertNotNull("Pull must contain the uploaded media", liveMedia)
+        assertNull("Live media must have null deleted_at", liveMedia!!.deleted_at)
+
+        val downloadResp = apiService.getMedia(mediaId)
+        assertTrue("Uploaded media must be streamable", downloadResp.isSuccessful)
+
+        // Step 3: Delete it — endpoint goes 404 and it leaves the live set...
+        val deleteResp = apiService.deleteMedia(mediaId)
+        assertTrue("Delete media must succeed", deleteResp.isSuccessful)
+
+        val goneResp = apiService.getMedia(mediaId)
+        assertEquals("Deleted media must no longer stream", 404, goneResp.code())
+
+        // ...surfacing in pull only as a tombstone, never as a live row.
+        val tombstonePull = apiService.syncPull(since = 0)
+        assertTrue(tombstonePull.isSuccessful)
+        val allMedia = tombstonePull.body()!!.media
+        val tombstone = allMedia.find { it.id == mediaId }
+        assertNotNull("Pull must return a tombstone for the deleted media", tombstone)
+        assertNotNull("Tombstone must carry deleted_at", tombstone!!.deleted_at)
+        assertFalse(
+            "Deleted media must be excluded from the live media listing",
+            allMedia.filter { it.deleted_at == null }.any { it.id == mediaId }
+        )
+    }
+
+    @Test
+    fun testEndToEnd_UploadToUnknownCommissionReturns404() = runBlocking {
+        val (token, _) = loginUser("unknown_comm_upload_regr")
+        authToken = token
+
+        // Uploading bytes for a commission the server has never seen must 404.
+        // This is why the client must push commissions before uploading images.
+        val unknownCommissionId = "never-pushed-comm-" + UUID.randomUUID().toString()
+        val mediaId = UUID.randomUUID().toString()
+        val testPayload = "RIFF\u0024\u0000\u0000\u0000WEBPVP8 \u0018\u0000\u0000\u0000Orphan Image Bytes".toByteArray()
+
+        val requestFile = testPayload.toRequestBody("image/webp".toMediaTypeOrNull())
+        val filePart = MultipartBody.Part.createFormData("file", "orphan.webp", requestFile)
+        val commIdPart = unknownCommissionId.toRequestBody("text/plain".toMediaTypeOrNull())
+        val mediaIdPart = mediaId.toRequestBody("text/plain".toMediaTypeOrNull())
+        val mediaTypePart = "reference".toRequestBody("text/plain".toMediaTypeOrNull())
+
+        val uploadResp = apiService.uploadMedia(
+            file = filePart,
+            commissionId = commIdPart,
+            mediaId = mediaIdPart,
+            mediaType = mediaTypePart
+        )
+        assertEquals(
+            "Upload for an unknown commission must return 404",
+            404,
+            uploadResp.code()
+        )
+    }
 }

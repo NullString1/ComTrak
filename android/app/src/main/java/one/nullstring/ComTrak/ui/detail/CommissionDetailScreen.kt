@@ -50,8 +50,6 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Tab
-import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -59,7 +57,6 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -188,7 +185,7 @@ fun CommissionDetailScreen(
                     CeramicSpecsCard(comm = comm)
                 }
 
-                // 4. Photo Gallery (Reference, WIP, Finished)
+                // 4. Photo Gallery (all photos in one list)
                 item {
                     PhotoGallerySection(
                         mediaList = mediaList,
@@ -200,25 +197,27 @@ fun CommissionDetailScreen(
                     )
                 }
 
-                // 5. Studio Timeline of Updates
+                // 5. Studio Timeline of Updates — heading kept with its empty-state copy so
+                // the pair reads as one block (8dp, matching title→body inside the cards)
+                // instead of floating apart at the generic 16dp item gap.
                 item {
-                    Text(
-                        text = "Studio Timeline (${updates.size} updates)",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(top = 8.dp)
-                    )
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text(
+                            text = "Studio Timeline (${updates.size} updates)",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+                        if (updates.isEmpty()) {
+                            Text(
+                                text = "No updates recorded yet. Post progress photos, clay/glaze notes, or state transitions below.",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
                 }
 
-                if (updates.isEmpty()) {
-                    item {
-                        Text(
-                            text = "No updates recorded yet. Post progress photos, clay/glaze notes, or state transitions below.",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                } else {
+                if (updates.isNotEmpty()) {
                     items(updates.reversed(), key = { it.id }) { update ->
                         TimelineUpdateCard(
                             update = update,
@@ -423,10 +422,7 @@ fun PhotoGallerySection(
     mediaList: List<MediaAttachmentEntity>,
     onAddFinishedPhoto: () -> Unit
 ) {
-    var selectedTab by remember { mutableIntStateOf(0) }
-    val tabs = listOf("Reference (${mediaList.count { it.mediaType == "reference" }})",
-                      "Progress (${mediaList.count { it.mediaType == "progress" }})",
-                      "Finished (${mediaList.count { it.mediaType == "finished" }})")
+    val allMedia = remember(mediaList) { mediaList.sortedBy { it.createdAt } }
 
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -439,48 +435,62 @@ fun PhotoGallerySection(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text("Photos & Reference", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                if (selectedTab == 2) {
-                    TextButton(onClick = onAddFinishedPhoto) {
-                        Icon(Icons.Default.AddAPhoto, contentDescription = null, modifier = Modifier.size(16.dp))
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text("Add Finished Pic")
-                    }
+                Text("Photos (${allMedia.size})", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                TextButton(onClick = onAddFinishedPhoto) {
+                    Icon(Icons.Default.AddAPhoto, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("Add Finished Pic")
                 }
             }
 
-            TabRow(selectedTabIndex = selectedTab) {
-                tabs.forEachIndexed { index, title ->
-                    Tab(
-                        selected = selectedTab == index,
-                        onClick = { selectedTab = index },
-                        text = { Text(title, fontSize = 12.sp) }
-                    )
-                }
-            }
+            // 8dp matches the title→body gap used by every other card on this screen
+            Spacer(modifier = Modifier.height(8.dp))
 
-            Spacer(modifier = Modifier.height(12.dp))
-
-            val currentType = when (selectedTab) {
-                0 -> "reference"
-                1 -> "progress"
-                else -> "finished"
-            }
-            val filteredMedia = mediaList.filter { it.mediaType == currentType }
-
-            if (filteredMedia.isEmpty()) {
-                Text("No $currentType photos uploaded.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            if (allMedia.isEmpty()) {
+                Text("No photos yet.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             } else {
                 LazyRow(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    contentPadding = PaddingValues(horizontal = 4.dp)
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    items(filteredMedia, key = { it.id }) { media ->
-                        MediaThumbnail(media = media)
+                    items(allMedia, key = { it.id }) { media ->
+                        Box {
+                            MediaThumbnail(media = media)
+                            MediaTypeBadge(
+                                mediaType = media.mediaType,
+                                modifier = Modifier
+                                    .align(Alignment.BottomStart)
+                                    .padding(6.dp)
+                            )
+                        }
                     }
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun MediaTypeBadge(mediaType: String, modifier: Modifier = Modifier) {
+    val label = when (mediaType) {
+        "reference" -> "REF"
+        "progress" -> "WIP"
+        "finished" -> "FINAL"
+        else -> mediaType.take(4).uppercase()
+    }
+
+    Box(
+        modifier = modifier
+            .clip(RoundedCornerShape(4.dp))
+            .background(Color.Black.copy(alpha = 0.62f))
+            .padding(horizontal = 5.dp, vertical = 2.dp)
+    ) {
+        Text(
+            text = label,
+            color = Color.White,
+            fontSize = 8.sp,
+            fontWeight = FontWeight.Bold,
+            letterSpacing = 0.5.sp
+        )
     }
 }
 

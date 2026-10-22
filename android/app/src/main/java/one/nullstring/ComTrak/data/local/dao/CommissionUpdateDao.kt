@@ -22,6 +22,9 @@ interface CommissionUpdateDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertOrUpdateAll(updates: List<CommissionUpdateEntity>)
 
+    @Query("SELECT * FROM commission_updates WHERE id = :id")
+    suspend fun getUpdateDirect(id: String): CommissionUpdateEntity?
+
     @Query("UPDATE commission_updates SET syncPending = 0 WHERE id IN (:ids)")
     suspend fun markSynced(ids: List<String>)
 

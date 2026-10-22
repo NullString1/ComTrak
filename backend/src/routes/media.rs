@@ -105,6 +105,7 @@ pub async fn upload_media(
         ) VALUES ($1, $2, $3, $4, $5, $6, $7, NULL, NULL, $8, $9, NULL)
         ON CONFLICT(id) DO UPDATE SET
             s3_key = excluded.s3_key,
+            media_type = excluded.media_type,
             file_size_bytes = excluded.file_size_bytes
         "#,
     )
@@ -120,11 +121,20 @@ pub async fn upload_media(
     .execute(&state.db)
     .await?;
 
-    // 3. If commission has no thumbnail yet, set this media as thumbnail
-    sqlx::query(
-        "UPDATE commissions SET thumbnail_media_id = $1 WHERE id = $2 AND thumbnail_media_id IS NULL",
+    // 3. Recompute thumbnail: latest progress photo wins; reference (just-uploaded)
+    // media is thumbnail only if no progress photos exist.
+    let thumbnail_id: Option<String> = sqlx::query_scalar::<_, String>(
+        "SELECT id FROM media_attachments WHERE commission_id = $1 AND media_type = 'progress' AND deleted_at IS NULL ORDER BY created_at DESC LIMIT 1",
     )
-    .bind(&media_id)
+    .bind(&comm_id)
+    .fetch_optional(&state.db)
+    .await?;
+    let thumbnail_id = thumbnail_id.unwrap_or_else(|| media_id.clone());
+
+    sqlx::query(
+        "UPDATE commissions SET thumbnail_media_id = $1 WHERE id = $2",
+    )
+    .bind(&thumbnail_id)
     .bind(&comm_id)
     .execute(&state.db)
     .await?;

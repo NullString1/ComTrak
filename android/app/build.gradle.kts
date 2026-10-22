@@ -13,7 +13,7 @@ android {
         applicationId = "one.nullstring.ComTrak"
         minSdk = 26
         targetSdk = 35
-        versionCode = 1
+        versionCode = 2
         versionName = "1.0.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
@@ -26,10 +26,28 @@ android {
             keyAlias = "androiddebugkey"
             keyPassword = "android"
         }
+        val releaseKeystore = file("${rootDir}/release.keystore")
+        val releaseStorePassword = (findProperty("COMTRAK_RELEASE_STORE_PASSWORD") as String?)
+            ?: System.getenv("COMTRAK_RELEASE_STORE_PASSWORD")
+        val releaseKeyPassword = (findProperty("COMTRAK_RELEASE_KEY_PASSWORD") as String?)
+            ?: System.getenv("COMTRAK_RELEASE_KEY_PASSWORD")
+        val releaseKeyAlias = (findProperty("COMTRAK_RELEASE_KEY_ALIAS") as String?)
+            ?: System.getenv("COMTRAK_RELEASE_KEY_ALIAS")
+            ?: "comtrak"
+
+        if (releaseKeystore.exists() && !releaseStorePassword.isNullOrBlank() && !releaseKeyPassword.isNullOrBlank()) {
+            create("release") {
+                storeFile = releaseKeystore
+                storePassword = releaseStorePassword
+                keyAlias = releaseKeyAlias
+                keyPassword = releaseKeyPassword
+            }
+        }
     }
 
     buildTypes {
         release {
+            signingConfig = signingConfigs.findByName("release") ?: signingConfigs.getByName("debug")
             isMinifyEnabled = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
@@ -46,6 +64,7 @@ android {
     }
     buildFeatures {
         compose = true
+        buildConfig = true
     }
     testOptions {
         unitTests {

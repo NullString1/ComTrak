@@ -267,6 +267,7 @@ async fn test_audit_sync_push_and_pull() {
         Json(SyncPushRequest {
             commissions: vec![],
             updates: vec![],
+            media: vec![],
         }),
     )
     .await
