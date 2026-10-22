@@ -65,16 +65,19 @@ jobs:
         run: |
           TAG="${{ github.ref_name }}"
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            TAG="manual-${{ github.sha }}"
+            TAG="v1.0.0-preview"
           fi
           APK_NAME="ComTrak-${TAG}.apk"
           cp android/app/build/outputs/apk/release/app-release.apk "$APK_NAME"
           echo "apk_name=$APK_NAME" >> "$GITHUB_OUTPUT"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
 
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           files: ${{ steps.prepare_asset.outputs.apk_name }}
+          tag_name: ${{ steps.prepare_asset.outputs.tag }}
+          name: Release ${{ steps.prepare_asset.outputs.tag }}
           generate_release_notes: true
           draft: false
           prerelease: false
