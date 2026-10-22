@@ -27,12 +27,12 @@ android {
             keyPassword = "android"
         }
         val releaseKeystore = file("${rootDir}/release.keystore")
-        val releaseStorePassword = (findProperty("COMTRAK_RELEASE_STORE_PASSWORD") as String?)
-            ?: System.getenv("COMTRAK_RELEASE_STORE_PASSWORD")
-        val releaseKeyPassword = (findProperty("COMTRAK_RELEASE_KEY_PASSWORD") as String?)
-            ?: System.getenv("COMTRAK_RELEASE_KEY_PASSWORD")
-        val releaseKeyAlias = (findProperty("COMTRAK_RELEASE_KEY_ALIAS") as String?)
-            ?: System.getenv("COMTRAK_RELEASE_KEY_ALIAS")
+        val releaseStorePassword = providers.gradleProperty("COMTRAK_RELEASE_STORE_PASSWORD").orNull
+            ?: providers.environmentVariable("COMTRAK_RELEASE_STORE_PASSWORD").orNull
+        val releaseKeyPassword = providers.gradleProperty("COMTRAK_RELEASE_KEY_PASSWORD").orNull
+            ?: providers.environmentVariable("COMTRAK_RELEASE_KEY_PASSWORD").orNull
+        val releaseKeyAlias = providers.gradleProperty("COMTRAK_RELEASE_KEY_ALIAS").orNull
+            ?: providers.environmentVariable("COMTRAK_RELEASE_KEY_ALIAS").orNull
             ?: "comtrak"
 
         if (releaseKeystore.exists() && !releaseStorePassword.isNullOrBlank() && !releaseKeyPassword.isNullOrBlank()) {

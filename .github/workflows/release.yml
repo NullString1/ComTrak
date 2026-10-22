@@ -43,12 +43,22 @@ jobs:
 
       - name: Build Release APK
         env:
-          COMTRAK_RELEASE_STORE_PASSWORD: ${{ secrets.COMTRAK_RELEASE_STORE_PASSWORD }}
-          COMTRAK_RELEASE_KEY_PASSWORD: ${{ secrets.COMTRAK_RELEASE_KEY_PASSWORD }}
-          COMTRAK_RELEASE_KEY_ALIAS: ${{ secrets.COMTRAK_RELEASE_KEY_ALIAS }}
+          STORE_PASS: ${{ secrets.COMTRAK_RELEASE_STORE_PASSWORD }}
+          KEY_PASS: ${{ secrets.COMTRAK_RELEASE_KEY_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.COMTRAK_RELEASE_KEY_ALIAS }}
         run: |
           cd android
-          ./gradlew assembleRelease
+          ARGS=()
+          if [ -n "$STORE_PASS" ]; then
+            ARGS+=("-PCOMTRAK_RELEASE_STORE_PASSWORD=$STORE_PASS")
+          fi
+          if [ -n "$KEY_PASS" ]; then
+            ARGS+=("-PCOMTRAK_RELEASE_KEY_PASSWORD=$KEY_PASS")
+          fi
+          if [ -n "$KEY_ALIAS" ]; then
+            ARGS+=("-PCOMTRAK_RELEASE_KEY_ALIAS=$KEY_ALIAS")
+          fi
+          ./gradlew assembleRelease "${ARGS[@]}"
 
       - name: Prepare APK Asset
         id: prepare_asset
